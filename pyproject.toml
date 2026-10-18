@@ -1,0 +1,14 @@
+[project]
+name = "khateef-smart-file-organizer"
+version = "1.0.0"
+description = "A safe Python CLI tool to organize files by type."
+readme = "README.md"
+requires-python = ">=3.10"
+license = "MIT"
+authors = [
+  { name = "Khateef" },
+]
+keywords = ["python", "file-organizer", "cli", "automation"]
+
+[project.urls]
+Repository = "https://github.com/YOUR-GITHUB-USERNAME/khateef-smart-file-organizer"

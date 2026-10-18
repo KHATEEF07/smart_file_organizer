@@ -1,0 +1,96 @@
+"""Khateef's Smart File Organizer — organize files into folders by file type."""
+from __future__ import annotations
+
+import argparse
+import shutil
+from collections import Counter
+from pathlib import Path
+
+CATEGORIES = {
+    "Images": {".png", ".jpg", ".jpeg", ".gif", ".bmp", ".webp", ".svg", ".tiff"},
+    "Documents": {".pdf", ".doc", ".docx", ".txt", ".rtf", ".odt", ".md", ".ppt", ".pptx", ".xls", ".xlsx", ".csv"},
+    "Videos": {".mp4", ".mkv", ".mov", ".avi", ".webm", ".wmv"},
+    "Audio": {".mp3", ".wav", ".aac", ".flac", ".ogg", ".m4a"},
+    "Archives": {".zip", ".rar", ".7z", ".tar", ".gz"},
+    "Code": {".py", ".js", ".ts", ".html", ".css", ".java", ".c", ".cpp", ".json", ".xml", ".sql", ".sh"},
+    "Installers": {".exe", ".msi", ".dmg", ".apk", ".deb", ".rpm"},
+}
+
+
+def category_for(path: Path) -> str:
+    """Return the category folder for a path based on its extension."""
+    suffix = path.suffix.lower()
+    for category, extensions in CATEGORIES.items():
+        if suffix in extensions:
+            return category
+    return "Others"
+
+
+def unique_destination(destination: Path) -> Path:
+    """Avoid overwriting an existing file by adding a numbered suffix."""
+    if not destination.exists():
+        return destination
+    number = 1
+    while True:
+        candidate = destination.with_name(f"{destination.stem} ({number}){destination.suffix}")
+        if not candidate.exists():
+            return candidate
+        number += 1
+
+
+def organize(folder: Path, apply: bool = False) -> tuple[Counter, list[str]]:
+    """Plan or perform organization of direct child files in folder."""
+    folder = folder.expanduser().resolve()
+    if not folder.exists() or not folder.is_dir():
+        raise ValueError(f"Folder does not exist or is not a directory: {folder}")
+
+    counts: Counter = Counter()
+    messages: list[str] = []
+    # Only direct child files are considered; generated category folders are not scanned.
+    for source in sorted(folder.iterdir(), key=lambda p: p.name.lower()):
+        if not source.is_file() or source.name.startswith("."):
+            continue
+        category = category_for(source)
+        target_folder = folder / category
+        target = unique_destination(target_folder / source.name)
+        counts[category] += 1
+        if apply:
+            target_folder.mkdir(exist_ok=True)
+            shutil.move(str(source), str(target))
+            messages.append(f"MOVED  {source.name} -> {category}/{target.name}")
+        else:
+            messages.append(f"PLAN   {source.name} -> {category}/{target.name}")
+    return counts, messages
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(
+        prog="khateef-organizer",
+        description="Khateef's Smart File Organizer — sort files safely by file type.",
+    )
+    parser.add_argument("folder", type=Path, help="Folder whose direct files you want to organize")
+    parser.add_argument("--apply", action="store_true", help="Actually move files (default is a safe preview)")
+    args = parser.parse_args()
+    try:
+        counts, messages = organize(args.folder, apply=args.apply)
+    except (ValueError, OSError) as exc:
+        parser.error(str(exc))
+    print("\nKhateef's Smart File Organizer")
+    print("=" * 32)
+    if not messages:
+        print("No files found to organize.")
+    else:
+        for message in messages:
+            print(message)
+        print("\nSummary:")
+        for category, count in sorted(counts.items()):
+            print(f"  {category}: {count}")
+    if not args.apply:
+        print("\nPreview only. Add --apply to move the listed files.")
+    else:
+        print("\nOrganization complete.")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

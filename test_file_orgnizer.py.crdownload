@@ -1,0 +1,60 @@
+"""Automated tests for Khateef's Smart File Organizer.
+
+Maintainer: Khateef
+"""
+
+import tempfile
+import unittest
+from pathlib import Path
+
+from file_organizer import category_for, organize
+
+
+class FileOrganizerTests(unittest.TestCase):
+    def test_known_extension(self):
+        self.assertEqual(category_for(Path("photo.JPG")), "Images")
+
+    def test_unknown_extension(self):
+        self.assertEqual(category_for(Path("data.custom")), "Others")
+
+    def test_preview_does_not_move_files(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            file = root / "notes.txt"
+            file.write_text("hello", encoding="utf-8")
+            counts, messages = organize(root)
+            self.assertTrue(file.exists())
+            self.assertEqual(counts["Documents"], 1)
+            self.assertIn("PLAN", messages[0])
+
+    def test_apply_moves_file(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            file = root / "photo.png"
+            file.write_text("image placeholder", encoding="utf-8")
+            organize(root, apply=True)
+            self.assertFalse(file.exists())
+            self.assertTrue((root / "Images" / "photo.png").exists())
+
+    def test_duplicate_name_is_preserved(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            (root / "Documents").mkdir()
+            (root / "Documents" / "notes.txt").write_text("old", encoding="utf-8")
+            (root / "notes.txt").write_text("new", encoding="utf-8")
+            organize(root, apply=True)
+            self.assertEqual((root / "Documents" / "notes.txt").read_text(encoding="utf-8"), "old")
+            self.assertEqual((root / "Documents" / "notes (1).txt").read_text(encoding="utf-8"), "new")
+
+    def test_hidden_files_are_skipped(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            hidden = root / ".secret.txt"
+            hidden.write_text("hidden", encoding="utf-8")
+            counts, messages = organize(root, apply=True)
+            self.assertTrue(hidden.exists())
+            self.assertEqual(len(messages), 0)
+
+
+if __name__ == "__main__":
+    unittest.main()
